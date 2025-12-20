@@ -59,17 +59,25 @@ enum AttendanceStatus {
 }
 
 model Class {
-  id           String         @id @default(auto()) @map("_id") @db.ObjectId
-  name         String
-  date         String
-  style        String?
-  description  String?
-  teacherId    String?        @db.ObjectId
-  Attendance   Attendance[]
-  ClassStudent ClassStudent[]
-  Feedback     Feedback[]
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  style       String?
+  description String?
+  teacherId   String? @db.ObjectId
+
+  // Campos de recorrência (todas as classes usam o mesmo sistema)
+  active        Boolean   @default(true)
+  recurringDays Int[] // Dias da semana: 0=domingo, 1=segunda, ..., 6=sábado
+  scheduleTimes Json // { "0": { "startTime": "19:00", "endTime": "21:00" }, "2": { ... } }
+  startDate     DateTime // Data de início da recorrência (ou data única da classe)
+  endDate       DateTime? // Data de fim (null = sem limite)
+
+  Attendance     Attendance[]
+  ClassStudent   ClassStudent[]
+  Feedback       Feedback[]
+  ClassException ClassException[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 }
 
 model ClassStudent {
@@ -100,7 +108,7 @@ model Attendance {
 
 model Feedback {
   id                String         @id @default(auto()) @map("_id") @db.ObjectId
-  studentId          String         @db.ObjectId
+  studentId         String         @db.ObjectId
   classId           String         @db.ObjectId
   Class             Class?         @relation(fields: [classId], references: [id], onDelete: Cascade)
   date              DateTime
@@ -112,6 +120,16 @@ model Feedback {
   updatedAt         DateTime       @updatedAt
 }
 
+model ClassException {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  classId   String   @db.ObjectId
+  date      DateTime
+  reason    String?
+  Class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-
-
+  @@unique([classId, date])
+  @@index([classId])
+  @@index([date])
+}

@@ -9,6 +9,7 @@ async function main() {
   await prisma.feedback.deleteMany();
   await prisma.attendance.deleteMany();
   await prisma.classStudent.deleteMany();
+  await prisma.classException.deleteMany();
   await prisma.class.deleteMany();
   await prisma.news.deleteMany();
   await prisma.event.deleteMany();
@@ -57,17 +58,80 @@ async function main() {
   });
   console.log('✅ Secretary user:', secretary.email);
 
-  // ========== CLASS ==========
+  // ========== CLASS (única - mesma data de início e fim) ==========
+  const singleClassDate = new Date();
+  const singleClassDayOfWeek = singleClassDate.getDay(); // 0=domingo, 1=segunda, ...
+
   const classData = await prisma.class.create({
-      data: {
-        name: 'Asa Branca',
-        date: new Date().toISOString().split('T')[0], // Formato YYYY-MM-DD
-        style: 'Forró',
-        description: 'Turma de forró para iniciantes',
-        teacherId: teacher.id,
+    data: {
+      name: 'Asa Branca',
+      style: 'Forró',
+      description: 'Turma de forró para iniciantes',
+      teacherId: teacher.id,
+      active: true,
+      recurringDays: [singleClassDayOfWeek], // Dia da semana da data específica
+      scheduleTimes: {
+        [singleClassDayOfWeek.toString()]: {
+          startTime: '18:00',
+          endTime: '20:00',
+        },
       },
-    });
-    console.log('✅ Class created:', classData.name);
+      startDate: singleClassDate, // Data da classe única
+      endDate: singleClassDate, // Mesma data (classe única)
+    },
+  });
+  console.log('✅ Single class created:', classData.name);
+
+  // ========== CLASS RECORRENTE ==========
+  // Classe que acontece toda terça e quinta (2, 4)
+  // Terça: 19h-21h, Quinta: 20h-22h (horários diferentes por dia!)
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - 7); // Começa 7 dias atrás para ter exemplos no calendário
+  
+  const endDate = new Date();
+  endDate.setDate(endDate.getDate() + 90); // Termina em 90 dias
+
+  const recurringClass = await prisma.class.create({
+    data: {
+      name: 'Aula de Forró - Avançado',
+      style: 'Forró',
+      description: 'Aula de forró toda terça (19h-21h) e quinta-feira (20h-22h)',
+      teacherId: teacher.id,
+      active: true,
+      recurringDays: [2, 4], // Terça e Quinta (0=domingo, 1=segunda, 2=terça, 3=quarta, 4=quinta...)
+      scheduleTimes: {
+        '2': { startTime: '19:00', endTime: '21:00' }, // Terça
+        '4': { startTime: '20:00', endTime: '22:00' }, // Quinta (horário diferente)
+      },
+      startDate: startDate,
+      endDate: endDate,
+    },
+  });
+  console.log('✅ Recurring class created:', recurringClass.name);
+
+  // ========== NOVA CLASSE (aluno não matriculado) ==========
+  const unenrolledClassStartDate = new Date();
+  unenrolledClassStartDate.setDate(unenrolledClassStartDate.getDate() - 7);
+  
+  const unenrolledClassEndDate = new Date();
+  unenrolledClassEndDate.setDate(unenrolledClassEndDate.getDate() + 90);
+
+  const unenrolledClass = await prisma.class.create({
+    data: {
+      name: 'Samba de Gafieira',
+      style: 'Samba',
+      description: 'Aula de samba de gafieira toda segunda-feira (18h-20h)',
+      teacherId: teacher.id,
+      active: true,
+      recurringDays: [1], // Segunda-feira (0=domingo, 1=segunda...)
+      scheduleTimes: {
+        '1': { startTime: '18:00', endTime: '20:00' }, // Segunda
+      },
+      startDate: unenrolledClassStartDate,
+      endDate: unenrolledClassEndDate,
+    },
+  });
+  console.log('✅ Unenrolled class created:', unenrolledClass.name);
 
   // ========== CLASS STUDENT ==========
   await prisma.classStudent.create({
@@ -78,6 +142,15 @@ async function main() {
   });
   console.log('✅ ClassStudent created');
 
+  // Matricular estudante na classe recorrente também
+  await prisma.classStudent.create({
+    data: {
+      classId: recurringClass.id,
+      studentId: student.id,
+    },
+  });
+  console.log('✅ ClassStudent created for recurring class');
+
   // ========== ATTENDANCE ==========  
   await prisma.attendance.create({
     data: {
@@ -86,20 +159,60 @@ async function main() {
       date: new Date(),
       status: 'PRESENT',
     },
-  })
+  });
   console.log('✅ Attendance created');
 
-  // ========== EVENT ==========
+  // Criar presença para uma das aulas da classe recorrente (última terça-feira)
+  const lastTuesday = new Date();
+  lastTuesday.setDate(lastTuesday.getDate() - ((lastTuesday.getDay() + 5) % 7)); // Última terça
+  lastTuesday.setHours(19, 0, 0, 0);
+  
+  if (lastTuesday <= new Date()) {
+    await prisma.attendance.create({
+      data: {
+        classId: recurringClass.id,
+        studentId: student.id,
+        date: lastTuesday,
+        status: 'PRESENT',
+      },
+    });
+    console.log('✅ Attendance created for recurring class');
+  }
+
+  // ========== CLASS EXCEPTION (exemplo) ==========
+  // Cancelar a próxima quinta-feira da classe recorrente
+  const nextThursday = new Date();
+  const currentDay = nextThursday.getDay(); // 0 = domingo, 4 = quinta
+  let daysToAdd = 4 - currentDay; // Diferença até quinta
+  if (daysToAdd <= 0) {
+    daysToAdd += 7; // Se já passou quinta, pegar a próxima semana
+  }
+  nextThursday.setDate(nextThursday.getDate() + daysToAdd);
+  nextThursday.setHours(0, 0, 0, 0);
+
+  // Só criar exceção se a data estiver dentro do período de recorrência
+  if (nextThursday <= endDate && nextThursday >= startDate) {
+    await prisma.classException.create({
+      data: {
+        classId: recurringClass.id,
+        date: nextThursday,
+        reason: 'Feriado - Classe cancelada',
+      },
+    });
+    console.log('✅ ClassException created (next Thursday cancelled)');
+  }
+
+  // ========== EVENT (evento único) ==========
   const event = await prisma.event.create({
     data: {
-      title: 'Aula de Forró',
-      description: 'Aula prática de forró para todos os níveis',
+      title: 'Workshop de Samba',
+      description: 'Workshop especial de samba para todos os níveis - evento único',
       start: new Date(Date.now() + 24 * 60 * 60 * 1000), // Amanhã
       end: new Date(Date.now() + 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000), // 2 horas depois
       backgroundColor: '#3b82f6',
       borderColor: '#2563eb',
     },
-  })
+  });
   console.log('✅ Event created:', event.title);
 
   // ========== NEWS ==========

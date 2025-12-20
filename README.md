@@ -201,6 +201,66 @@ Para obter um token, faça login através do endpoint `/api/auth/login`.
 - `/api/attendance` - Frequência
 - `/health` - Health check
 
+### 📚 Classes - Sistema de Recorrência
+
+Todas as classes usam um sistema unificado de recorrência. Classes "únicas" são apenas classes recorrentes com `startDate = endDate` e `recurringDays` contendo apenas o dia da semana correspondente.
+
+#### Estrutura de uma Classe
+
+```json
+{
+  "name": "Aula de Forró",
+  "description": "Aula avançada",
+  "teacherId": "...",
+  "style": "Forró",
+  "active": true,
+  "recurringDays": [2, 3],  // Terça (2) e Quarta (3)
+  "scheduleTimes": {
+    "2": { "startTime": "19:00", "endTime": "21:00" },  // Terça
+    "3": { "startTime": "20:00", "endTime": "22:00" }   // Quarta (horário diferente)
+  },
+  "startDate": "2024-01-01T00:00:00.000Z",
+  "endDate": "2024-12-31T00:00:00.000Z"  // null = sem limite
+}
+```
+
+#### Campos Importantes
+
+- **`recurringDays`**: Array de números (0-6) representando os dias da semana (0=Domingo, 6=Sábado)
+- **`scheduleTimes`**: Objeto onde cada chave é um dia da semana (string) com `startTime` e `endTime` (formato HH:MM)
+- **`startDate`**: Data de início da recorrência (obrigatório)
+- **`endDate`**: Data de fim (opcional, `null` = recorrência sem limite)
+- **Classe única**: Use `startDate = endDate` e `recurringDays = [diaDaSemana]`
+
+#### Exemplo: Criar Classe Recorrente
+
+```bash
+POST /api/classes
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{
+  "name": "Aula de Samba",
+  "description": "Aula toda terça e quinta",
+  "teacherId": "507f1f77bcf86cd799439011",
+  "style": "Samba",
+  "recurringDays": [2, 4],
+  "scheduleTimes": {
+    "2": { "startTime": "19:00", "endTime": "21:00" },
+    "4": { "startTime": "19:00", "endTime": "21:00" }
+  },
+  "startDate": "2024-01-01T00:00:00.000Z",
+  "endDate": "2024-12-31T00:00:00.000Z"
+}
+```
+
+#### Eventos no Calendário
+
+O endpoint `/api/events` retorna eventos individuais expandidos a partir das classes recorrentes. O backend faz a expansão automaticamente, considerando:
+- Dias da semana definidos em `recurringDays`
+- Horários específicos de cada dia em `scheduleTimes`
+- Exceções (datas canceladas) via `ClassException`
+
 ## ⚙️ Scripts Disponíveis
 
 | Script | Descrição |

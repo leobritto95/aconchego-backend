@@ -9,6 +9,7 @@ import filtersRoutes from './routes/filters.routes';
 import classesRoutes from './routes/classes.routes';
 import usersRoutes from './routes/users.routes';
 import attendanceRoutes from './routes/attendance.routes';
+import classExceptionRoutes from './routes/classException.routes';
 import { errorHandler } from './middleware/error.middleware';
 
 const app = express();
@@ -29,6 +30,7 @@ app.use('/api/filters', filtersRoutes);
 app.use('/api/classes', classesRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/class-exceptions', classExceptionRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'API is running' });

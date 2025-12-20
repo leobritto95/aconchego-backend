@@ -2,6 +2,10 @@ import { Request, Response, NextFunction } from 'express';
 import prisma from '../utils/prisma';
 import { createError } from '../middleware/error.middleware';
 import { handlePrismaError, isPrismaError } from '../utils/prismaError';
+import {
+  validateRecurringDays,
+  validateScheduleTimes,
+} from '../utils/recurrenceUtils';
 
 export const getClasses = async (
   _: Request,
@@ -24,8 +28,12 @@ export const getClasses = async (
         name: cls.name,
         description: cls.description,
         teacherId: cls.teacherId,
-        date: cls.date,
         style: cls.style,
+        active: cls.active,
+        recurringDays: cls.recurringDays,
+        scheduleTimes: cls.scheduleTimes,
+        startDate: cls.startDate,
+        endDate: cls.endDate,
         attendanceCount: cls.Attendance.length,
         studentsCount: cls.ClassStudent.length,
         createdAt: cls.createdAt,
@@ -74,7 +82,7 @@ export const getClassById = async (
               },
             })
           )
-        ).then((results) => results.filter((s): s is NonNullable<typeof s> => s !== null))
+        ).then((results) => results.filter((s) => s !== null))
       : [];
 
     const studentsMap = new Map(students.map((s) => [s.id, s]));
@@ -86,8 +94,12 @@ export const getClassById = async (
         name: classItem.name,
         description: classItem.description,
         teacherId: classItem.teacherId,
-        date: classItem.date,
         style: classItem.style,
+        active: classItem.active,
+        recurringDays: classItem.recurringDays,
+        scheduleTimes: classItem.scheduleTimes,
+        startDate: classItem.startDate,
+        endDate: classItem.endDate,
         attendance: classItem.Attendance.map((att) => ({
           id: att.id,
           studentId: att.studentId,
@@ -123,10 +135,37 @@ export const createClass = async (
   next: NextFunction
 ) => {
   try {
-    const { name, description, teacherId, date, style } = req.body;
+    const {
+      name,
+      description,
+      teacherId,
+      style,
+      active,
+      recurringDays,
+      scheduleTimes,
+      startDate,
+      endDate,
+    } = req.body;
 
     if (!name || !description || !teacherId) {
       throw createError('Nome, descrição e teacherId são obrigatórios', 400);
+    }
+
+    // Validar campos de recorrência (sempre obrigatórios agora)
+    if (!recurringDays || !validateRecurringDays(recurringDays)) {
+      throw createError(
+        'Dias da semana inválidos. Use números de 0 (domingo) a 6 (sábado)',
+        400
+      );
+    }
+    if (!scheduleTimes || !validateScheduleTimes(scheduleTimes, recurringDays)) {
+      throw createError(
+        'scheduleTimes inválido. Deve ser um objeto com horários (startTime/endTime no formato HH:MM) para cada dia recorrente',
+        400
+      );
+    }
+    if (!startDate) {
+      throw createError('Data de início é obrigatória', 400);
     }
 
     const classItem = await prisma.class.create({
@@ -134,8 +173,12 @@ export const createClass = async (
         name,
         description,
         teacherId,
-        date: date || new Date().toISOString(),
         style,
+        active: active !== undefined ? active : true,
+        recurringDays,
+        scheduleTimes,
+        startDate: new Date(startDate),
+        endDate: endDate ? new Date(endDate) : null,
       },
     });
 
@@ -146,8 +189,12 @@ export const createClass = async (
         name: classItem.name,
         description: classItem.description,
         teacherId: classItem.teacherId,
-        date: classItem.date,
         style: classItem.style,
+        active: classItem.active,
+        recurringDays: classItem.recurringDays,
+        scheduleTimes: classItem.scheduleTimes,
+        startDate: classItem.startDate,
+        endDate: classItem.endDate,
         createdAt: classItem.createdAt,
         updatedAt: classItem.updatedAt,
       },
@@ -164,17 +211,58 @@ export const updateClass = async (
 ) => {
   try {
     const { id } = req.params;
-    const { name, date, style, description, teacherId } = req.body;
+    const {
+      name,
+      style,
+      description,
+      teacherId,
+      active,
+      recurringDays,
+      scheduleTimes,
+      startDate,
+      endDate,
+    } = req.body;
+
+    // Buscar classe atual para validar scheduleTimes se necessário
+    const currentClass = await prisma.class.findUnique({
+      where: { id },
+      select: { recurringDays: true },
+    });
+
+    if (!currentClass) {
+      throw createError('Classe não encontrada', 404);
+    }
+
+    // Validar campos de recorrência se fornecidos
+    const finalRecurringDays = recurringDays !== undefined ? recurringDays : currentClass.recurringDays;
+    
+    if (recurringDays !== undefined && !validateRecurringDays(recurringDays)) {
+      throw createError('Dias da semana inválidos', 400);
+    }
+
+    if (scheduleTimes !== undefined && !validateScheduleTimes(scheduleTimes, finalRecurringDays)) {
+      throw createError(
+        'scheduleTimes inválido. Deve ser um objeto com horários (startTime/endTime no formato HH:MM) para cada dia recorrente',
+        400
+      );
+    }
+
+    // Construir objeto de atualização
+    const updateData: any = {
+      ...(name && { name }),
+      ...(style !== undefined && { style }),
+      ...(description !== undefined && { description }),
+      ...(teacherId !== undefined && { teacherId }),
+      ...(active !== undefined && { active }),
+      ...(recurringDays !== undefined && { recurringDays }),
+      ...(scheduleTimes !== undefined && { scheduleTimes }),
+      ...(startDate !== undefined && { startDate: new Date(startDate) }),
+      ...(endDate !== undefined && { endDate: endDate ? new Date(endDate) : null }),
+    };
 
     const classItem = await prisma.class.update({
       where: { id },
-      data: {
-        ...(name && { name }),
-        ...(date && { date }),
-        ...(style !== undefined && { style }),
-        ...(description !== undefined && { description }),
-        ...(teacherId !== undefined && { teacherId }),
-      },
+      data: updateData,
     });
 
     res.json({
@@ -184,8 +272,12 @@ export const updateClass = async (
         name: classItem.name,
         description: classItem.description,
         teacherId: classItem.teacherId,
-        date: classItem.date,
         style: classItem.style,
+        active: classItem.active,
+        recurringDays: classItem.recurringDays,
+        scheduleTimes: classItem.scheduleTimes,
+        startDate: classItem.startDate,
+        endDate: classItem.endDate,
         createdAt: classItem.createdAt,
         updatedAt: classItem.updatedAt,
       },
@@ -214,7 +306,6 @@ export const deleteClass = async (
         name: deletedClass.name,
         description: deletedClass.description,
         teacherId: deletedClass.teacherId,
-        date: deletedClass.date,
         style: deletedClass.style,
         createdAt: deletedClass.createdAt,
         updatedAt: deletedClass.updatedAt,

@@ -10,8 +10,8 @@ import { authenticate } from '../middleware/auth.middleware';
 
 const router = express.Router();
 
-router.get('/', getEvents);
-router.get('/:id', getEventById);
+router.get('/', authenticate, getEvents);
+router.get('/:id', authenticate, getEventById);
 router.post('/', authenticate, createEvent);
 router.put('/:id', authenticate, updateEvent);
 router.delete('/:id', authenticate, deleteEvent);
