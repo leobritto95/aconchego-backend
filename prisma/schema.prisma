@@ -1,0 +1,117 @@
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  STUDENT
+  TEACHER
+  SECRETARY
+  ADMIN
+}
+
+enum FeedbackStatus {
+  APPROVED
+  REJECTED
+  PENDING
+}
+
+model User {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String   @unique
+  password  String
+  name      String
+  role      UserRole
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Event {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  title           String
+  description     String?
+  start           DateTime
+  end             DateTime
+  backgroundColor String?  @default("#3b82f6")
+  borderColor     String?  @default("#3b82f6")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model News {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  content     String
+  author      String?
+  imageUrl    String?
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+}
+
+model Class {
+  id           String         @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  date         String
+  style        String?
+  description  String?
+  teacherId    String?        @db.ObjectId
+  Attendance   Attendance[]
+  ClassStudent ClassStudent[]
+  Feedback     Feedback[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model ClassStudent {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  classId   String   @db.ObjectId
+  studentId String   @db.ObjectId
+  Class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([classId, studentId])
+  @@index([classId])
+  @@index([studentId])
+}
+
+model Attendance {
+  id        String           @id @default(auto()) @map("_id") @db.ObjectId
+  classId   String           @db.ObjectId
+  studentId String           @db.ObjectId
+  date      DateTime
+  status    AttendanceStatus
+  Class     Class            @relation(fields: [classId], references: [id], onDelete: Cascade)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([classId, studentId, date])
+}
+
+model Feedback {
+  id                String         @id @default(auto()) @map("_id") @db.ObjectId
+  studentId          String         @db.ObjectId
+  classId           String         @db.ObjectId
+  Class             Class?         @relation(fields: [classId], references: [id], onDelete: Cascade)
+  date              DateTime
+  average           Float
+  status            FeedbackStatus
+  evaluatorFeedback String?
+  parameters        Json?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+}
+
+
+
+

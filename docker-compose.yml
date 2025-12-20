@@ -1,0 +1,17 @@
+services:
+  mongo-aconchego:
+    image: bitnami/mongodb:latest
+    ports:
+      - "27018:27017"
+    environment:
+      MONGODB_REPLICA_SET_MODE: primary
+      MONGODB_REPLICA_SET_NAME: replicaset
+      MONGODB_ADVERTISED_HOSTNAME: mongo-aconchego
+      MONGODB_ROOT_PASSWORD: password
+      MONGODB_REPLICA_SET_KEY: replicasetkey1
+    volumes:
+      - mongo-data:/bitnami/mongodb
+
+volumes:
+  mongo-data:
+
