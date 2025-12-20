@@ -1,3 +1,5 @@
+import { CALENDAR_COLORS } from '../constants/calendarColors';
+
 interface ScheduleTime {
   startTime: string;
   endTime: string;
@@ -135,13 +137,12 @@ export function expandRecurringClasses(
             : false;
 
           // Cores diferentes baseadas na matrícula
-          // Verde (#10b981) = matriculado, Laranja (#f59e0b) = não matriculado
           const backgroundColor = isEnrolled
-            ? classItem.backgroundColor || '#10b981'
-            : '#f59e0b';
+            ? classItem.backgroundColor || CALENDAR_COLORS.enrolled.backgroundColor
+            : CALENDAR_COLORS.notEnrolled.backgroundColor;
           const borderColor = isEnrolled
-            ? classItem.borderColor || '#059669'
-            : '#d97706';
+            ? classItem.borderColor || CALENDAR_COLORS.enrolled.borderColor
+            : CALENDAR_COLORS.notEnrolled.borderColor;
 
           events.push({
             id: `class-${classItem.id}-${currentDate.toISOString().split('T')[0]}`,
@@ -247,4 +248,5 @@ export function formatRecurringDays(days: number[]): string {
     .map((day) => dayNames[day])
     .join(', ');
 }
+
 

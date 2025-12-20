@@ -4,6 +4,7 @@ import { createError } from "../middleware/error.middleware";
 import { handlePrismaError } from "../utils/prismaError";
 import { expandRecurringClasses } from "../utils/recurrenceUtils";
 import { AuthRequest } from "../middleware/auth.middleware";
+import { CALENDAR_COLORS } from "../constants/calendarColors";
 
 export const getEvents = async (
   req: AuthRequest,
@@ -36,8 +37,8 @@ export const getEvents = async (
       title: event.title,
       start: event.start.toISOString(),
       end: event.end.toISOString(),
-      backgroundColor: event.backgroundColor || "#3b82f6",
-      borderColor: event.borderColor || "#3b82f6",
+      backgroundColor: event.backgroundColor || CALENDAR_COLORS.singleEvent.backgroundColor,
+      borderColor: event.borderColor || CALENDAR_COLORS.singleEvent.borderColor,
       description: event.description,
       extendedProps: {
         type: "single-event",
@@ -130,8 +131,8 @@ export const getEvents = async (
         scheduleTimes: c.scheduleTimes as Record<string, { startTime: string; endTime: string }>,
         startDate: c.startDate,
         endDate: c.endDate,
-        backgroundColor: "#10b981", // Verde padrão (matriculado)
-        borderColor: "#059669",
+        backgroundColor: CALENDAR_COLORS.enrolled.backgroundColor, // Verde padrão (matriculado)
+        borderColor: CALENDAR_COLORS.enrolled.borderColor,
       })),
       exceptions.map((e) => ({
         classId: e.classId,
