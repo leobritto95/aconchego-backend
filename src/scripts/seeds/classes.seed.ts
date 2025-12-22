@@ -13,11 +13,18 @@ export async function seedClasses(teacherId: string): Promise<SeedClasses> {
   console.log('📚 Seeding classes...');
 
   // ========== CLASS (única - mesma data de início e fim) ==========
-  // Classe única que acontece em uma data específica
-  // Horário: 18h-20h
-  const singleClassDate = new Date();
-  singleClassDate.setDate(singleClassDate.getDate() - 30); // 1 mês antes (aproximadamente 30 dias)
-  const singleClassDayOfWeek = singleClassDate.getDay(); // 0=domingo, 1=segunda, ...
+  // Classe única que acontece na próxima quarta-feira (3)
+  // Quarta: 12h-14h
+  const nextWednesday = new Date();
+  const currentDay = nextWednesday.getDay(); // 0 = domingo, 3 = quarta
+  let daysToAdd = 3 - currentDay; // Diferença até quarta
+  if (daysToAdd <= 0) {
+    daysToAdd += 7; // Se já passou quarta, pegar a próxima semana
+  }
+  nextWednesday.setDate(nextWednesday.getDate() + daysToAdd);
+  nextWednesday.setHours(10, 0, 0, 0); // 10:00
+  
+  const singleClassDayOfWeek = 3; // Quarta-feira (fixo)
 
   const classData = await prisma.class.create({
     data: {
@@ -26,15 +33,15 @@ export async function seedClasses(teacherId: string): Promise<SeedClasses> {
       description: 'Turma de forró para iniciantes',
       teacherId: teacherId,
       active: true,
-      recurringDays: [singleClassDayOfWeek], // Dia da semana da data específica
+      recurringDays: [singleClassDayOfWeek],
       scheduleTimes: {
         [singleClassDayOfWeek.toString()]: {
-          startTime: '18:00',
-          endTime: '20:00',
+          startTime: '10:00',
+          endTime: '12:00',
         },
       },
-      startDate: singleClassDate, // Data da classe única
-      endDate: singleClassDate, // Mesma data (classe única)
+      startDate: nextWednesday,
+      endDate: nextWednesday,
     },
   });
   console.log('✅ Single class created:', classData.name);
