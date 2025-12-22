@@ -8,10 +8,10 @@ export const CALENDAR_COLORS = {
     backgroundColor: '#10b981',
     borderColor: '#059669',
   },
-  // Classes/Aulas - Não matriculado
+  // Classes/Aulas - Não matriculado (roxo claro)
   notEnrolled: {
-    backgroundColor: '#f59e0b',
-    borderColor: '#d97706',
+    backgroundColor: '#c4b5fd',
+    borderColor: '#a78bfa',
   },
   // Eventos únicos
   singleEvent: {
