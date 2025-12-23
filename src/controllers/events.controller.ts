@@ -17,13 +17,22 @@ export const getEvents = async (
     // ===== 1. BUSCAR EVENTOS ÚNICOS =====
     const whereEvents: any = {};
 
+    // Filtrar eventos que se sobrepõem ao range de datas solicitado
+    // Um evento se sobrepõe se: começa antes do fim do range E termina depois do início do range
     if (start || end) {
-      whereEvents.OR = [];
-      if (start) {
-        whereEvents.OR.push({ start: { gte: new Date(start as string) } });
+      const startDate = start ? new Date(start as string) : null;
+      const endDate = end ? new Date(end as string) : null;
+      
+      whereEvents.AND = [];
+      
+      if (startDate) {
+        // Evento termina depois do início do range (ou não tem fim)
+        whereEvents.AND.push({ end: { gte: startDate } });
       }
-      if (end) {
-        whereEvents.OR.push({ end: { lte: new Date(end as string) } });
+      
+      if (endDate) {
+        // Evento começa antes do fim do range
+        whereEvents.AND.push({ start: { lte: endDate } });
       }
     }
 
@@ -53,7 +62,7 @@ export const getEvents = async (
       ? new Date(end as string)
       : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 dias à frente se não especificado
 
-    // Buscar todas as classes ativas
+    // Buscar todas as classes ativas com informações do professor
     const classes = await prisma.class.findMany({
       where: {
         active: true,
@@ -79,12 +88,34 @@ export const getEvents = async (
         name: true,
         style: true,
         description: true,
+        teacherId: true,
         recurringDays: true,
         scheduleTimes: true,
         startDate: true,
         endDate: true,
       },
     });
+
+    // Buscar nomes dos professores
+    const teacherIds = classes
+      .map((c) => c.teacherId)
+      .filter((id): id is string => id !== null);
+    
+    const teachers = teacherIds.length > 0
+      ? await prisma.user.findMany({
+          where: {
+            id: { in: teacherIds },
+            role: 'TEACHER',
+          },
+          select: {
+            id: true,
+            name: true,
+          },
+        })
+      : [];
+
+    // Criar mapa de teacherId -> teacherName
+    const teacherMap = new Map(teachers.map((t) => [t.id, t.name]));
 
     // ===== 3. BUSCAR EXCEÇÕES (dias cancelados) =====
     const classIds = classes.map((c) => c.id);
@@ -127,6 +158,7 @@ export const getEvents = async (
         name: c.name,
         style: c.style,
         description: c.description,
+        teacherName: c.teacherId ? teacherMap.get(c.teacherId) || null : null,
         recurringDays: c.recurringDays,
         scheduleTimes: c.scheduleTimes as Record<string, { startTime: string; endTime: string }>,
         startDate: c.startDate,
