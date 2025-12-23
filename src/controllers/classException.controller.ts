@@ -3,9 +3,61 @@ import prisma from '../utils/prisma';
 import { createError } from '../middleware/error.middleware';
 import { handlePrismaError, isPrismaError } from '../utils/prismaError';
 
+interface ScheduleTime {
+  startTime: string;
+  endTime: string;
+}
+
+type ScheduleTimes = Record<string, ScheduleTime>;
+
 /**
- * Cancela um dia específico de uma classe
+ * Normaliza uma data para o início do dia (00:00:00)
  */
+function normalizeDate(date: Date | string): Date {
+  const normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+  return normalized;
+}
+
+/**
+ * Verifica se uma aula já começou baseado no horário de início
+ */
+function hasClassStarted(
+  scheduleTimes: ScheduleTimes,
+  dayOfWeek: number,
+  currentTime: Date
+): boolean {
+  const daySchedule = scheduleTimes[dayOfWeek.toString()];
+  if (!daySchedule?.startTime) {
+    return false;
+  }
+
+  const [startHour, startMinute] = daySchedule.startTime.split(':').map(Number);
+  const classStartTime = new Date(currentTime);
+  classStartTime.setHours(startHour, startMinute, 0, 0);
+
+  return currentTime >= classStartTime;
+}
+
+/**
+ * Constrói filtro de data para consultas
+ */
+function buildDateFilter(startDate?: string, endDate?: string) {
+  const filter: { gte?: Date; lte?: Date } = {};
+
+  if (startDate) {
+    filter.gte = normalizeDate(startDate);
+  }
+
+  if (endDate) {
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    filter.lte = end;
+  }
+
+  return filter;
+}
+
 export const createClassException = async (
   req: Request,
   res: Response,
@@ -27,9 +79,24 @@ export const createClassException = async (
       throw createError('Classe não encontrada', 404);
     }
 
-    // Normalizar data (remover horas, manter apenas a data)
-    const exceptionDate = new Date(date);
-    exceptionDate.setHours(0, 0, 0, 0);
+    const exceptionDate = normalizeDate(date);
+    const today = normalizeDate(new Date());
+    const now = new Date();
+
+    // Validar que a data não é no passado
+    if (exceptionDate < today) {
+      throw createError('Não é possível cancelar aulas em datas passadas', 400);
+    }
+
+    // Se a data é hoje, verificar se o horário da aula já passou
+    if (exceptionDate.getTime() === today.getTime()) {
+      const scheduleTimes = classItem.scheduleTimes as unknown as ScheduleTimes;
+      const dayOfWeek = exceptionDate.getDay();
+
+      if (hasClassStarted(scheduleTimes, dayOfWeek, now)) {
+        throw createError('Não é possível cancelar aulas que já começaram', 400);
+      }
+    }
 
     const exception = await prisma.classException.create({
       data: {
@@ -69,9 +136,6 @@ export const createClassException = async (
   }
 };
 
-/**
- * Lista exceções de uma classe
- */
 export const getClassExceptions = async (
   req: Request,
   res: Response,
@@ -110,9 +174,52 @@ export const getClassExceptions = async (
   }
 };
 
-/**
- * Remove uma exceção (reativa o dia no calendário)
- */
+export const getAllClassExceptions = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const dateFilter = buildDateFilter(
+      startDate as string | undefined,
+      endDate as string | undefined
+    );
+
+    const exceptions = await prisma.classException.findMany({
+      where: {
+        ...(Object.keys(dateFilter).length > 0 && { date: dateFilter }),
+      },
+      orderBy: { date: 'asc' },
+      include: {
+        Class: {
+          select: {
+            id: true,
+            name: true,
+            style: true,
+          },
+        },
+      },
+    });
+
+    res.json({
+      success: true,
+      data: exceptions.map((ex) => ({
+        id: ex.id,
+        classId: ex.classId,
+        date: ex.date,
+        reason: ex.reason,
+        className: ex.Class.name,
+        classStyle: ex.Class.style,
+        createdAt: ex.createdAt,
+        updatedAt: ex.updatedAt,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const deleteClassException = async (
   req: Request,
   res: Response,
