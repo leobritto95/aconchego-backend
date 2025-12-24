@@ -3,6 +3,8 @@ import bcrypt from 'bcryptjs';
 import prisma from '../utils/prisma';
 import { createError } from '../middleware/error.middleware';
 import { handlePrismaError, isPrismaError } from '../utils/prismaError';
+import { AuthRequest } from '../middleware/auth.middleware';
+import { getPaginationParams, getPaginationResult } from '../utils/pagination';
 
 export const getUsers = async (
   req: Request,
@@ -10,9 +12,7 @@ export const getUsers = async (
   next: NextFunction
 ) => {
   try {
-    const page = Number.parseInt(req.query.page as string) || 1;
-    const limit = Number.parseInt(req.query.limit as string) || 10;
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = getPaginationParams(req);
 
     const where: any = {};
 
@@ -45,7 +45,7 @@ export const getUsers = async (
       prisma.user.count({ where }),
     ]);
 
-    const totalPages = Math.ceil(total / limit);
+    const pagination = getPaginationResult(total, page, limit);
 
     res.json({
       success: true,
@@ -58,12 +58,7 @@ export const getUsers = async (
           createdAt: user.createdAt,
           updatedAt: user.updatedAt,
         })),
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages,
-        },
+        ...pagination,
       },
     });
   } catch (error) {
@@ -112,12 +107,21 @@ export const getUserById = async (
 };
 
 export const createUser = async (
-  req: Request,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const { email, password, name, role } = req.body;
+    if (!req.user) {
+      throw createError('Usuário não autenticado', 401);
+    }
+
+    const allowedRoles = ['TEACHER', 'SECRETARY', 'ADMIN'];
+    if (!allowedRoles.includes(req.user.role.toUpperCase())) {
+      throw createError('Você não tem permissão para cadastrar usuários', 403);
+    }
+
+    const { email, password, name, role, classIds } = req.body;
 
     if (!email || !password || !name || !role) {
       throw createError('Email, senha, nome e role são obrigatórios', 400);
@@ -128,19 +132,34 @@ export const createUser = async (
       throw createError('Role inválido', 400);
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     });
 
     if (existingUser) {
-      throw createError('Email já está em uso', 409);
+      return next(createError('Email já está em uso', 409));
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Se for aluno e tiver classIds, validar que as classes existem
+    if (role.toUpperCase() === 'STUDENT' && classIds && Array.isArray(classIds) && classIds.length > 0) {
+      const classes = await prisma.class.findMany({
+        where: {
+          id: { in: classIds },
+        },
+      });
+
+      if (classes.length !== classIds.length) {
+        throw createError('Uma ou mais classes não foram encontradas', 404);
+      }
+    }
+
     const user = await prisma.user.create({
       data: {
-        email,
+        email: normalizedEmail,
         password: hashedPassword,
         name,
         role: role.toUpperCase(),
@@ -155,6 +174,31 @@ export const createUser = async (
       },
     });
 
+    // Se for aluno e tiver classIds, matricular nas turmas
+    const enrolledClasses = [];
+    if (role.toUpperCase() === 'STUDENT' && classIds && Array.isArray(classIds) && classIds.length > 0) {
+      for (const classId of classIds) {
+        try {
+          const classStudent = await prisma.classStudent.create({
+            data: {
+              classId,
+              studentId: user.id,
+            },
+          });
+          enrolledClasses.push({
+            id: classStudent.id,
+            classId: classStudent.classId,
+            studentId: classStudent.studentId,
+          });
+        } catch (error: any) {
+          // Ignora erro se o aluno já estiver matriculado na turma
+          if (!isPrismaError(error) || error.code !== 'P2002') {
+            throw error;
+          }
+        }
+      }
+    }
+
     res.status(201).json({
       success: true,
       data: {
@@ -164,12 +208,25 @@ export const createUser = async (
         role: user.role.toLowerCase(),
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
+        enrolledClasses: enrolledClasses.length > 0 ? enrolledClasses : undefined,
       },
     });
   } catch (error) {
-    if (isPrismaError(error) && error.code === 'P2002') {
-      return next(createError('Email já está em uso', 409));
+    // Se já é um erro criado com createError, passar direto
+    if ((error as any).statusCode) {
+      return next(error);
     }
+    
+    // Tratar erro de constraint única do Prisma (email duplicado)
+    if (isPrismaError(error) && error.code === 'P2002') {
+      // Verificar se é erro de email duplicado
+      const errorMeta = (error as any).meta;
+      if (errorMeta?.target && Array.isArray(errorMeta.target) && errorMeta.target.includes('email')) {
+        return next(createError('Email já está em uso', 409));
+      }
+      return next(createError('Registro duplicado', 409));
+    }
+    
     handlePrismaError(error, 'Erro ao criar usuário', next);
   }
 };
@@ -186,15 +243,18 @@ export const updateUser = async (
     const updateData: any = {};
 
     if (email) {
+      // Normalizar email (trim e lowercase)
+      const normalizedEmail = email.trim().toLowerCase();
+      
       const existingUser = await prisma.user.findUnique({
-        where: { email },
+        where: { email: normalizedEmail },
       });
 
       if (existingUser && existingUser.id !== id) {
-        throw createError('Email já está em uso', 409);
+        return next(createError('Email já está em uso', 409));
       }
 
-      updateData.email = email;
+      updateData.email = normalizedEmail;
     }
 
     if (name) {
@@ -238,9 +298,21 @@ export const updateUser = async (
       },
     });
   } catch (error) {
-    if (isPrismaError(error) && error.code === 'P2002') {
-      return next(createError('Email já está em uso', 409));
+    // Se já é um erro criado com createError, passar direto
+    if ((error as any).statusCode) {
+      return next(error);
     }
+    
+    // Tratar erro de constraint única do Prisma (email duplicado)
+    if (isPrismaError(error) && error.code === 'P2002') {
+      // Verificar se é erro de email duplicado
+      const errorMeta = (error as any).meta;
+      if (errorMeta?.target && Array.isArray(errorMeta.target) && errorMeta.target.includes('email')) {
+        return next(createError('Email já está em uso', 409));
+      }
+      return next(createError('Registro duplicado', 409));
+    }
+    
     handlePrismaError(error, 'Usuário não encontrado', next);
   }
 };
@@ -265,6 +337,36 @@ export const deleteUser = async (
     handlePrismaError(error, 'Usuário não encontrado', next);
   }
 };
+
+export const getUserCounts = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const [total, students, teachers, secretaries, admins] = await Promise.all([
+      prisma.user.count(),
+      prisma.user.count({ where: { role: 'STUDENT' } }),
+      prisma.user.count({ where: { role: 'TEACHER' } }),
+      prisma.user.count({ where: { role: 'SECRETARY' } }),
+      prisma.user.count({ where: { role: 'ADMIN' } }),
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        total,
+        students,
+        teachers,
+        secretaries,
+        admins,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 
 
 
