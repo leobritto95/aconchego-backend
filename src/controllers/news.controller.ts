@@ -2,12 +2,11 @@ import { Request, Response, NextFunction } from 'express';
 import prisma from '../utils/prisma';
 import { createError } from '../middleware/error.middleware';
 import { handlePrismaError } from '../utils/prismaError';
+import { getPaginationParams, getPaginationResult } from '../utils/pagination';
 
 export const getNews = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const page = Number.parseInt(req.query.page as string) || 1;
-    const limit = Number.parseInt(req.query.limit as string) || 10;
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = getPaginationParams(req);
 
     const [news, total] = await Promise.all([
       prisma.news.findMany({
@@ -18,7 +17,7 @@ export const getNews = async (req: Request, res: Response, next: NextFunction) =
       prisma.news.count(),
     ]);
 
-    const totalPages = Math.ceil(total / limit);
+    const pagination = getPaginationResult(total, page, limit);
 
     res.json({
       success: true,
@@ -31,10 +30,7 @@ export const getNews = async (req: Request, res: Response, next: NextFunction) =
           author: item.author,
           imageUrl: item.imageUrl,
         })),
-        total,
-        page,
-        limit,
-        totalPages,
+        ...pagination,
       },
     });
   } catch (error) {
