@@ -6,6 +6,7 @@ import {
   validateRecurringDays,
   validateScheduleTimes,
 } from '../utils/recurrenceUtils';
+import { getPaginationParams, getPaginationResult } from '../utils/pagination';
 
 export const getClasses = async (
   _: Request,
@@ -371,5 +372,136 @@ export const registerStudentToClass = async (
       return next(createError('Estudante já está registrado nesta classe', 409));
     }
     handlePrismaError(error, 'Erro ao registrar estudante', next);
+  }
+};
+
+export const removeStudentFromClass = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id: classId, studentId } = req.params;
+
+    if (!studentId) {
+      throw createError('studentId é obrigatório', 400);
+    }
+
+    const classExists = await prisma.class.findUnique({
+      where: { id: classId },
+    });
+
+    if (!classExists) {
+      throw createError('Classe não encontrada', 404);
+    }
+
+    const classStudent = await prisma.classStudent.findUnique({
+      where: {
+        classId_studentId: {
+          classId,
+          studentId,
+        },
+      },
+    });
+
+    if (!classStudent) {
+      throw createError('Estudante não está registrado nesta classe', 404);
+    }
+
+    await prisma.classStudent.delete({
+      where: {
+        classId_studentId: {
+          classId,
+          studentId,
+        },
+      },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        message: 'Estudante removido da classe com sucesso',
+      },
+    });
+  } catch (error) {
+    handlePrismaError(error, 'Erro ao remover estudante da classe', next);
+  }
+};
+
+export const getAvailableStudents = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id: classId } = req.params;
+    const { page, limit, skip } = getPaginationParams(req);
+
+    // Verificar se a classe existe
+    const classExists = await prisma.class.findUnique({
+      where: { id: classId },
+      select: { id: true },
+    });
+
+    if (!classExists) {
+      throw createError('Classe não encontrada', 404);
+    }
+
+    // Buscar IDs dos alunos já matriculados na turma
+    const enrolledStudents = await prisma.classStudent.findMany({
+      where: { classId },
+      select: { studentId: true },
+    });
+
+    const enrolledStudentIds = enrolledStudents.map((es) => es.studentId);
+
+    // Construir query para buscar alunos não matriculados
+    const where: any = {
+      role: 'STUDENT',
+      id: {
+        notIn: enrolledStudentIds.length > 0 ? enrolledStudentIds : [],
+      },
+    };
+
+    // Adicionar busca por nome ou email se fornecido
+    if (req.query.search) {
+      where.OR = [
+        { name: { contains: req.query.search as string, mode: 'insensitive' } },
+        { email: { contains: req.query.search as string, mode: 'insensitive' } },
+      ];
+    }
+
+    const [students, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { name: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+        },
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    const pagination = getPaginationResult(total, page, limit);
+
+    res.json({
+      success: true,
+      data: {
+        data: students.map((student) => ({
+          id: student.id,
+          name: student.name,
+          email: student.email,
+          role: student.role.toLowerCase(),
+        })),
+        ...pagination,
+      },
+    });
+  } catch (error) {
+    handlePrismaError(error, 'Erro ao buscar alunos disponíveis', next);
   }
 };
