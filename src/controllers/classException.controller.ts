@@ -48,6 +48,61 @@ function buildDateFilter(startDate?: string, endDate?: string) {
   return filter;
 }
 
+export const getClassExceptions = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { classId, startDate, endDate } = req.query;
+    const dateFilter = buildDateFilter(
+      startDate as string | undefined,
+      endDate as string | undefined
+    );
+
+    // Construir filtro: se classId for fornecido, filtrar por ele; caso contrário, buscar todas
+    const whereFilter: { classId?: string; date?: { gte?: Date; lte?: Date } } = {};
+    
+    if (classId) {
+      whereFilter.classId = classId as string;
+    }
+
+    if (Object.keys(dateFilter).length > 0) {
+      whereFilter.date = dateFilter;
+    }
+
+    const exceptions = await prisma.classException.findMany({
+      where: Object.keys(whereFilter).length > 0 ? whereFilter : {},
+      orderBy: { date: 'asc' },
+      include: {
+        Class: {
+          select: {
+            id: true,
+            name: true,
+            style: true,
+          },
+        },
+      },
+    });
+
+    res.json({
+      success: true,
+      data: exceptions.map((ex) => ({
+        id: ex.id,
+        classId: ex.classId,
+        date: ex.date,
+        reason: ex.reason,
+        className: ex.Class.name,
+        classStyle: ex.Class.style,
+        createdAt: ex.createdAt,
+        updatedAt: ex.updatedAt,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const createClassException = async (
   req: Request,
   res: Response,
@@ -123,90 +178,6 @@ export const createClassException = async (
       );
     }
     handlePrismaError(error, 'Erro ao criar exceção', next);
-  }
-};
-
-export const getClassExceptions = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { classId } = req.params;
-
-    const exceptions = await prisma.classException.findMany({
-      where: { classId },
-      orderBy: { date: 'asc' },
-      include: {
-        Class: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-    });
-
-    res.json({
-      success: true,
-      data: exceptions.map((ex) => ({
-        id: ex.id,
-        classId: ex.classId,
-        date: ex.date,
-        reason: ex.reason,
-        className: ex.Class.name,
-        createdAt: ex.createdAt,
-        updatedAt: ex.updatedAt,
-      })),
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getAllClassExceptions = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { startDate, endDate } = req.query;
-    const dateFilter = buildDateFilter(
-      startDate as string | undefined,
-      endDate as string | undefined
-    );
-
-    const exceptions = await prisma.classException.findMany({
-      where: {
-        ...(Object.keys(dateFilter).length > 0 && { date: dateFilter }),
-      },
-      orderBy: { date: 'asc' },
-      include: {
-        Class: {
-          select: {
-            id: true,
-            name: true,
-            style: true,
-          },
-        },
-      },
-    });
-
-    res.json({
-      success: true,
-      data: exceptions.map((ex) => ({
-        id: ex.id,
-        classId: ex.classId,
-        date: ex.date,
-        reason: ex.reason,
-        className: ex.Class.name,
-        classStyle: ex.Class.style,
-        createdAt: ex.createdAt,
-        updatedAt: ex.updatedAt,
-      })),
-    });
-  } catch (error) {
-    next(error);
   }
 };
 
