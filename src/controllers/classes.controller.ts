@@ -118,7 +118,7 @@ export const getClassById = async (
               email: student.email,
               role: student.role.toLowerCase(),
             } : null,
-            registeredAt: cs.createdAt,
+            createdAt: cs.createdAt,
           };
         }),
         createdAt: classItem.createdAt,
@@ -152,7 +152,7 @@ export const createClass = async (
       throw createError('Nome, descrição e teacherId são obrigatórios', 400);
     }
 
-    // Validar campos de recorrência (sempre obrigatórios agora)
+    // Validar campos de recorrência
     if (!recurringDays || !validateRecurringDays(recurringDays)) {
       throw createError(
         'Dias da semana inválidos. Use números de 0 (domingo) a 6 (sábado)',

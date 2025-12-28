@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import prisma from '../utils/prisma';
 import { createError } from '../middleware/error.middleware';
 import { handlePrismaError, isPrismaError } from '../utils/prismaError';
+import { normalizeDate, getEndOfDay } from '../utils/dateUtils';
 
 interface ScheduleTime {
   startTime: string;
@@ -9,15 +10,6 @@ interface ScheduleTime {
 }
 
 type ScheduleTimes = Record<string, ScheduleTime>;
-
-/**
- * Normaliza uma data para o início do dia (00:00:00)
- */
-function normalizeDate(date: Date | string): Date {
-  const normalized = new Date(date);
-  normalized.setHours(0, 0, 0, 0);
-  return normalized;
-}
 
 /**
  * Verifica se uma aula já começou baseado no horário de início
@@ -50,9 +42,7 @@ function buildDateFilter(startDate?: string, endDate?: string) {
   }
 
   if (endDate) {
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
-    filter.lte = end;
+    filter.lte = getEndOfDay(endDate);
   }
 
   return filter;
