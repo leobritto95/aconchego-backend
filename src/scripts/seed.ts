@@ -4,6 +4,7 @@ import { clearDatabase } from './seeds/clear.seed';
 import { seedUsers } from './seeds/users.seed';
 import { seedClasses } from './seeds/classes.seed';
 import { seedClassStudents } from './seeds/classStudent.seed';
+import { seedAttendance } from './seeds/attendance.seed';
 import { seedEvents } from './seeds/events.seed';
 import { seedNews } from './seeds/news.seed';
 import { seedFeedback } from './seeds/feedback.seed';
@@ -22,7 +23,10 @@ async function main() {
   const classes = await seedClasses(users.teachers);
 
   // Matricular alunos em classes
-  await seedClassStudents(users.students, classes);
+  const enrollments = await seedClassStudents(users.students, classes);
+
+  // Criar presenças dos alunos
+  await seedAttendance(enrollments, classes);
 
   // Criar eventos
   await seedEvents();

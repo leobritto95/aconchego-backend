@@ -1,4 +1,5 @@
 import prisma from '../../utils/prisma';
+import { normalizeDate } from '../../utils/dateUtils';
 
 interface Teacher {
   id: string;
@@ -6,7 +7,55 @@ interface Teacher {
   name: string;
 }
 
-export type SeedClasses = Array<{ id: string; name: string }>;
+interface ScheduleTime {
+  startTime: string;
+  endTime: string;
+}
+
+export type SeedClasses = Array<{
+  id: string;
+  name: string;
+  startDate: Date;
+  endDate: Date | null;
+  recurringDays: number[];
+  scheduleTimes: Record<string, ScheduleTime>;
+}>;
+
+// Constantes para configuração de datas das classes
+const CLASS_DATE_CONFIG = {
+  // Range de meses para startDate (6 meses atrás até 2 meses atrás)
+  START_DATE_MONTHS_AGO: { min: 6, max: 2 },
+  // Dias no futuro para endDate padrão
+  DEFAULT_END_DATE_DAYS: 90,
+} as const;
+
+/**
+ * Calcula a data de início de uma classe baseado no seu índice
+ * Classes mais antigas têm índices menores
+ */
+function calculateStartDate(classIndex: number, totalClasses: number): Date {
+  const now = new Date();
+  const minDate = new Date(now);
+  minDate.setMonth(now.getMonth() - CLASS_DATE_CONFIG.START_DATE_MONTHS_AGO.min);
+  
+  const maxDate = new Date(now);
+  maxDate.setMonth(now.getMonth() - CLASS_DATE_CONFIG.START_DATE_MONTHS_AGO.max);
+  
+  // Distribuir uniformemente: classe 0 = mais antiga, última = mais recente
+  const progress = totalClasses > 1 ? classIndex / (totalClasses - 1) : 0;
+  const date = new Date(minDate.getTime() + (maxDate.getTime() - minDate.getTime()) * progress);
+  
+  return normalizeDate(date);
+}
+
+/**
+ * Calcula a data de fim padrão para classes
+ */
+function getDefaultEndDate(): Date {
+  const endDate = new Date();
+  endDate.setDate(endDate.getDate() + CLASS_DATE_CONFIG.DEFAULT_END_DATE_DAYS);
+  return normalizeDate(endDate);
+}
 
 export async function seedClasses(teachers: Teacher[]): Promise<SeedClasses> {
   console.log('📚 Seeding classes...');
@@ -19,33 +68,7 @@ export async function seedClasses(teachers: Teacher[]): Promise<SeedClasses> {
     return teacher.id;
   };
 
-  // Todas as classes terão startDate entre 6 meses atrás e 2 meses atrás
-  // A classe no índice 0 será a mais antiga, e a última será a mais recente
-  const getStartDate = (classIndex: number, totalClasses: number): Date => {
-    const now = new Date();
-    const sixMonthsAgo = new Date(now);
-    sixMonthsAgo.setMonth(now.getMonth() - 6);
-    
-    const twoMonthsAgo = new Date(now);
-    twoMonthsAgo.setMonth(now.getMonth() - 2);
-    
-    // Calcular diferença em milissegundos
-    const totalDiff = twoMonthsAgo.getTime() - sixMonthsAgo.getTime();
-    
-    // Distribuir uniformemente: classe 0 = mais antiga, última = mais recente
-    const progress = classIndex / (totalClasses - 1);
-    const date = new Date(sixMonthsAgo.getTime() + totalDiff * progress);
-    
-    // Zerar horas, minutos, segundos e milissegundos para consistência
-    date.setHours(0, 0, 0, 0);
-    
-    return date;
-  };
-
-  // Configuração de data de fim padrão (90 dias no futuro)
-  const defaultEndDate = new Date();
-  defaultEndDate.setDate(defaultEndDate.getDate() + 90);
-  defaultEndDate.setHours(0, 0, 0, 0);
+  const defaultEndDate = getDefaultEndDate();
 
   // Array de configurações das classes
   const classesConfig = [
@@ -176,15 +199,14 @@ export async function seedClasses(teachers: Teacher[]): Promise<SeedClasses> {
   // Criar todas as classes
   const classData = await Promise.all(
     classesConfig.map(async (config, index) => {
-      const startDate = getStartDate(index, classesConfig.length);
+      const startDate = calculateStartDate(index, classesConfig.length);
       let endDate: Date | null = null;
       
       if (config.isSingleClass) {
-        endDate = new Date(startDate);
-        endDate.setHours(0, 0, 0, 0);
+        // Classe única: endDate = startDate
+        endDate = normalizeDate(new Date(startDate));
       } else if (config.endDate) {
-        endDate = new Date(config.endDate);
-        endDate.setHours(0, 0, 0, 0);
+        endDate = normalizeDate(new Date(config.endDate));
       }
 
       const created = await prisma.class.create({
@@ -202,7 +224,15 @@ export async function seedClasses(teachers: Teacher[]): Promise<SeedClasses> {
       });
 
       console.log(`✅ Class created: ${created.name}`);
-      return { id: created.id, name: created.name };
+      
+      return { 
+        id: created.id, 
+        name: created.name,
+        startDate: created.startDate,
+        endDate: created.endDate,
+        recurringDays: created.recurringDays,
+        scheduleTimes: created.scheduleTimes as unknown as Record<string, ScheduleTime>,
+      } as SeedClasses[number];
     })
   );
 
