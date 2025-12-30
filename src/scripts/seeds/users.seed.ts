@@ -5,6 +5,7 @@ export interface SeedUsers {
   admin: { id: string; email: string };
   student: { id: string; email: string };
   teacher: { id: string; email: string };
+  teachers: Array<{ id: string; email: string; name: string }>;
   secretary: { id: string; email: string };
 }
 
@@ -43,6 +44,32 @@ export async function seedUsers(): Promise<SeedUsers> {
   });
   console.log('✅ Teacher user:', teacher.email);
 
+  const teacher2 = await prisma.user.create({
+    data: {
+      email: 'professor2@aconchego.com',
+      password: hashedPassword,
+      name: 'Carlos Oliveira',
+      role: 'TEACHER',
+    },
+  });
+  console.log('✅ Teacher 2 user:', teacher2.email);
+
+  const teacher3 = await prisma.user.create({
+    data: {
+      email: 'professor3@aconchego.com',
+      password: hashedPassword,
+      name: 'Ana Paula Lima',
+      role: 'TEACHER',
+    },
+  });
+  console.log('✅ Teacher 3 user:', teacher3.email);
+
+  const teachers = [
+    { id: teacher.id, email: teacher.email, name: teacher.name },
+    { id: teacher2.id, email: teacher2.email, name: teacher2.name },
+    { id: teacher3.id, email: teacher3.email, name: teacher3.name },
+  ];
+
   const secretary = await prisma.user.create({
     data: {
       email: 'secretaria@aconchego.com',
@@ -57,6 +84,7 @@ export async function seedUsers(): Promise<SeedUsers> {
     admin: { id: admin.id, email: admin.email },
     student: { id: student.id, email: student.email },
     teacher: { id: teacher.id, email: teacher.email },
+    teachers,
     secretary: { id: secretary.id, email: secretary.email },
   };
 }

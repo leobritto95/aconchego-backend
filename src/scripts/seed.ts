@@ -18,8 +18,8 @@ async function main() {
   // Criar usuários
   const users = await seedUsers();
 
-  // Criar classes (depende de teacher)
-  const classes = await seedClasses(users.teacher.id);
+  // Criar classes (depende de teachers)
+  const classes = await seedClasses(users.teachers);
 
   // Matricular alunos em classes
   await seedClassStudents(users.student.id, classes);
@@ -37,7 +37,9 @@ async function main() {
   console.log('\n📝 Credenciais de login:');
   console.log('   Admin: admin@aconchego.com / 123456');
   console.log('   Aluno: aluno@aconchego.com / 123456');
-  console.log('   Professor: professor@aconchego.com / 123456');
+  console.log('   Professor 1: professor@aconchego.com / 123456');
+  console.log('   Professor 2: professor2@aconchego.com / 123456');
+  console.log('   Professor 3: professor3@aconchego.com / 123456');
   console.log('   Secretaria: secretaria@aconchego.com / 123456');
 }
 

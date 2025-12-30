@@ -9,8 +9,22 @@ export interface SeedClasses {
   afternoonClasses: Array<{ id: string; name: string }>;
 }
 
-export async function seedClasses(teacherId: string): Promise<SeedClasses> {
+interface Teacher {
+  id: string;
+  email: string;
+  name: string;
+}
+
+export async function seedClasses(teachers: Teacher[]): Promise<SeedClasses> {
   console.log('📚 Seeding classes...');
+  
+  // Distribuir professores de forma rotativa
+  let teacherIndex = 0;
+  const getNextTeacher = () => {
+    const teacher = teachers[teacherIndex % teachers.length];
+    teacherIndex++;
+    return teacher.id;
+  };
 
   // ========== CLASS (única - mesma data de início e fim) ==========
   // Classe única que acontece na próxima quarta-feira (3)
@@ -31,7 +45,7 @@ export async function seedClasses(teacherId: string): Promise<SeedClasses> {
       name: 'Aula de Forró - Iniciantes',
       style: 'Forró',
       description: 'Turma de forró para iniciantes',
-      teacherId: teacherId,
+      teacherId: getNextTeacher(),
       active: true,
       recurringDays: [singleClassDayOfWeek],
       scheduleTimes: {
@@ -60,7 +74,7 @@ export async function seedClasses(teacherId: string): Promise<SeedClasses> {
       name: 'Asa Branca',
       style: 'Forró',
       description: 'Aula de forró toda terça (18h-20h) e quinta-feira (18h-20h)',
-      teacherId: teacherId,
+      teacherId: getNextTeacher(),
       active: true,
       recurringDays: [2, 4], // Terça e Quinta (0=domingo, 1=segunda, 2=terça, 3=quarta, 4=quinta...)
       scheduleTimes: {
@@ -87,7 +101,7 @@ export async function seedClasses(teacherId: string): Promise<SeedClasses> {
       name: 'Balanço Carioca',
       style: 'Samba de Gafieira',
       description: 'Aula de samba de gafieira toda segunda-feira (18h-20h)',
-      teacherId: teacherId,
+      teacherId: getNextTeacher(),
       active: true,
       recurringDays: [1], // Segunda-feira (0=domingo, 1=segunda...)
       scheduleTimes: {
@@ -110,7 +124,7 @@ export async function seedClasses(teacherId: string): Promise<SeedClasses> {
       name: 'Pista Dourada',
       style: 'Dança de Salão',
       description: 'Aula de dança de salão toda sexta-feira à noite (20h-22h) e sábado à tarde (16h-18h)',
-      teacherId: teacherId,
+      teacherId: getNextTeacher(),
       active: true,
       recurringDays: [5, 6], // Sexta (5) e Sábado (6)
       scheduleTimes: {
@@ -138,7 +152,7 @@ export async function seedClasses(teacherId: string): Promise<SeedClasses> {
       name: 'Zumba Energia',
       style: 'Zumba',
       description: 'Aula de zumba para começar bem o dia - Segunda e Quarta (8h-10h)',
-      teacherId: teacherId,
+      teacherId: getNextTeacher(),
       active: true,
       recurringDays: [1, 3], // Segunda e Quarta
       scheduleTimes: {
@@ -159,7 +173,7 @@ export async function seedClasses(teacherId: string): Promise<SeedClasses> {
       name: 'Salsa Tropical',
       style: 'Salsa',
       description: 'Aula de salsa pela manhã - Terça e Quinta (10h-12h)',
-      teacherId: teacherId,
+      teacherId: getNextTeacher(),
       active: true,
       recurringDays: [2, 4], // Terça e Quinta
       scheduleTimes: {
@@ -180,7 +194,7 @@ export async function seedClasses(teacherId: string): Promise<SeedClasses> {
       name: 'Valsa Clássica',
       style: 'Valsa',
       description: 'Aula de valsa toda sexta-feira pela manhã (8h-10h)',
-      teacherId: teacherId,
+      teacherId: getNextTeacher(),
       active: true,
       recurringDays: [5], // Sexta
       scheduleTimes: {
@@ -200,7 +214,7 @@ export async function seedClasses(teacherId: string): Promise<SeedClasses> {
       name: 'Samba Raiz',
       style: 'Samba',
       description: 'Aula de samba aos sábados pela manhã (10h-12h)',
-      teacherId: teacherId,
+      teacherId: getNextTeacher(),
       active: true,
       recurringDays: [6], // Sábado
       scheduleTimes: {
@@ -227,7 +241,7 @@ export async function seedClasses(teacherId: string): Promise<SeedClasses> {
       name: 'Tango Argentino',
       style: 'Tango',
       description: 'Aula de tango à tarde - Segunda e Quarta (14h-16h)',
-      teacherId: teacherId,
+      teacherId: getNextTeacher(),
       active: true,
       recurringDays: [1, 3], // Segunda e Quarta
       scheduleTimes: {
@@ -248,7 +262,7 @@ export async function seedClasses(teacherId: string): Promise<SeedClasses> {
       name: 'Forró Nordestino',
       style: 'Forró',
       description: 'Aula de forró à tarde - Terça e Quinta (16h-18h)',
-      teacherId: teacherId,
+      teacherId: getNextTeacher(),
       active: true,
       recurringDays: [2, 4], // Terça e Quinta
       scheduleTimes: {
@@ -269,7 +283,7 @@ export async function seedClasses(teacherId: string): Promise<SeedClasses> {
       name: 'Gafieira Carioca',
       style: 'Samba de Gafieira',
       description: 'Aula de samba de gafieira toda sexta à tarde (14h-16h)',
-      teacherId: teacherId,
+      teacherId: getNextTeacher(),
       active: true,
       recurringDays: [5], // Sexta
       scheduleTimes: {
@@ -289,7 +303,7 @@ export async function seedClasses(teacherId: string): Promise<SeedClasses> {
       name: 'Salão de Domingos',
       style: 'Dança de Salão',
       description: 'Aula de dança de salão aos domingos à tarde (14h-16h)',
-      teacherId: teacherId,
+      teacherId: getNextTeacher(),
       active: true,
       recurringDays: [0], // Domingo
       scheduleTimes: {
@@ -309,7 +323,7 @@ export async function seedClasses(teacherId: string): Promise<SeedClasses> {
       name: 'Bolero Romântico',
       style: 'Bolero',
       description: 'Aula de bolero às quartas à tarde (16h-18h)',
-      teacherId: teacherId,
+      teacherId: getNextTeacher(),
       active: true,
       recurringDays: [3], // Quarta
       scheduleTimes: {
