@@ -35,7 +35,7 @@ export const getClasses = async (
 
     const classes = await prisma.class.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { startDate: 'asc' },
       include: {
         Attendance: true,
         ClassStudent: studentId
