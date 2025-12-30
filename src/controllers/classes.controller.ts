@@ -37,14 +37,11 @@ export const getClasses = async (
       where,
       orderBy: { startDate: 'asc' },
       include: {
-        Attendance: true,
-        ClassStudent: studentId
-          ? {
-              where: {
-                studentId: studentId as string,
-              },
-            }
-          : true,
+        _count: {
+          select: {
+            ClassStudent: true,
+          },
+        },
       },
     });
 
@@ -61,8 +58,7 @@ export const getClasses = async (
         scheduleTimes: cls.scheduleTimes,
         startDate: cls.startDate,
         endDate: cls.endDate,
-        attendanceCount: cls.Attendance.length,
-        studentsCount: cls.ClassStudent.length,
+        studentsCount: cls._count.ClassStudent,
         createdAt: cls.createdAt,
         updatedAt: cls.updatedAt,
       })),
