@@ -3,8 +3,7 @@ import prisma from '../../utils/prisma';
 
 export interface SeedUsers {
   admin: { id: string; email: string };
-  student: { id: string; email: string };
-  teacher: { id: string; email: string };
+  students: Array<{ id: string; email: string; name: string }>;
   teachers: Array<{ id: string; email: string; name: string }>;
   secretary: { id: string; email: string };
 }
@@ -24,51 +23,78 @@ export async function seedUsers(): Promise<SeedUsers> {
   });
   console.log('✅ Admin user:', admin.email);
 
-  const student = await prisma.user.create({
-    data: {
-      email: 'aluno@aconchego.com',
-      password: hashedPassword,
-      name: 'João da Silva',
-      role: 'STUDENT',
-    },
-  });
-  console.log('✅ Student user:', student.email);
-
-  const teacher = await prisma.user.create({
-    data: {
-      email: 'professor@aconchego.com',
-      password: hashedPassword,
-      name: 'Maria Santos',
-      role: 'TEACHER',
-    },
-  });
-  console.log('✅ Teacher user:', teacher.email);
-
-  const teacher2 = await prisma.user.create({
-    data: {
-      email: 'professor2@aconchego.com',
-      password: hashedPassword,
-      name: 'Carlos Oliveira',
-      role: 'TEACHER',
-    },
-  });
-  console.log('✅ Teacher 2 user:', teacher2.email);
-
-  const teacher3 = await prisma.user.create({
-    data: {
-      email: 'professor3@aconchego.com',
-      password: hashedPassword,
-      name: 'Ana Paula Lima',
-      role: 'TEACHER',
-    },
-  });
-  console.log('✅ Teacher 3 user:', teacher3.email);
-
-  const teachers = [
-    { id: teacher.id, email: teacher.email, name: teacher.name },
-    { id: teacher2.id, email: teacher2.email, name: teacher2.name },
-    { id: teacher3.id, email: teacher3.email, name: teacher3.name },
+  // Criar 20 alunos
+  const studentNames = [
+    'João da Silva',
+    'Ana Carolina Ferreira',
+    'Bruno Rodrigues',
+    'Carla Mendes',
+    'Daniel Alves',
+    'Eduarda Souza',
+    'Felipe Costa',
+    'Gabriela Martins',
+    'Henrique Silva',
+    'Isabela Oliveira',
+    'Julio Pereira',
+    'Larissa Santos',
+    'Marcos Vinicius',
+    'Natália Rocha',
+    'Otávio Lima',
+    'Patricia Gomes',
+    'Rafael Barbosa',
+    'Sofia Araújo',
+    'Thiago Nunes',
+    'Vanessa Campos',
   ];
+
+  const allStudents = await Promise.all(
+    studentNames.map((name, index) =>
+      prisma.user.create({
+        data: {
+          email: `aluno${index + 1}@aconchego.com`,
+          password: hashedPassword,
+          name,
+          role: 'STUDENT',
+        },
+      })
+    )
+  );
+
+  const students = allStudents.map((s) => ({
+    id: s.id,
+    email: s.email,
+    name: s.name,
+  }));
+
+  console.log(`✅ Created ${students.length} students total`);
+
+  // Criar 3 professores
+  const teacherNames = [
+    'Maria Santos',
+    'Carlos Oliveira',
+    'Ana Paula Lima',
+  ];
+
+  const allTeachers = await Promise.all(
+    teacherNames.map((name, index) =>
+      prisma.user.create({
+        data: {
+          email: `professor${index === 0 ? '' : index + 1}@aconchego.com`,
+          password: hashedPassword,
+          name,
+          role: 'TEACHER',
+        },
+      })
+    )
+  );
+
+  const teachers = allTeachers.map((t) => ({
+    id: t.id,
+    email: t.email,
+    name: t.name,
+  }));
+
+  console.log(`✅ Created ${teachers.length} teachers total`);
 
   const secretary = await prisma.user.create({
     data: {
@@ -82,8 +108,7 @@ export async function seedUsers(): Promise<SeedUsers> {
 
   return {
     admin: { id: admin.id, email: admin.email },
-    student: { id: student.id, email: student.email },
-    teacher: { id: teacher.id, email: teacher.email },
+    students,
     teachers,
     secretary: { id: secretary.id, email: secretary.email },
   };

@@ -22,7 +22,7 @@ async function main() {
   const classes = await seedClasses(users.teachers);
 
   // Matricular alunos em classes
-  await seedClassStudents(users.student.id, classes);
+  await seedClassStudents(users.students, classes);
 
   // Criar eventos
   await seedEvents();
@@ -31,7 +31,7 @@ async function main() {
   await seedNews();
 
   // Criar feedbacks
-  await seedFeedback(users.student.id, classes);
+  await seedFeedback(users.students[0].id, classes);
 
   console.log('✨ Seeding completed!');
   console.log('\n📝 Credenciais de login:');
