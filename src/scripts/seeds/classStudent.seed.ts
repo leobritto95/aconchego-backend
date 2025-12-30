@@ -13,22 +13,21 @@ export async function seedClassStudents(
 ): Promise<void> {
   console.log('👥 Seeding class students...');
 
-  // Coletar todas as classes em um array único e ordenado
   // Índice das classes (usado na distribuição abaixo):
-  // 0: Aula de Forró - Iniciantes
-  // 1: Asa Branca
-  // 2: Balanço Carioca
-  // 3: Pista Dourada
-  // 4-7: Zumba Energia, Salsa Tropical, Valsa Clássica, Samba Raiz
-  // 8-12: Tango Argentino, Forró Nordestino, Gafieira Carioca, Salão de Domingos, Bolero Romântico
-  const allClasses = [
-    classes.classData,
-    classes.recurringClass,
-    classes.unenrolledClass,
-    classes.newRecurringClass,
-    ...classes.morningClasses,
-    ...classes.afternoonClasses,
-  ];
+  // 0: Asa Branca
+  // 1: Balanço Carioca
+  // 2: Pista Dourada
+  // 3: Zumba Energia
+  // 4: Salsa Tropical
+  // 5: Valsa Clássica
+  // 6: Samba Raiz
+  // 7: Tango Argentino
+  // 8: Forró Nordestino
+  // 9: Gafieira Carioca
+  // 10: Salão de Domingos
+  // 11: Bolero Romântico
+  // 12: Aula de Forró - Iniciantes
+  const allClasses = classes;
 
   // Função auxiliar para matricular um aluno em classes específicas
   const enrollStudent = async (

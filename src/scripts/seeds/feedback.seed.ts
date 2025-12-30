@@ -10,7 +10,7 @@ export async function seedFeedback(
   await prisma.feedback.create({
     data: {
       studentId: studentId,
-      classId: classes.classData.id,
+      classId: classes[0].id,
       date: new Date(),
       average: 8.5,
       status: 'APPROVED',
