@@ -9,16 +9,42 @@ import {
 import { getPaginationParams, getPaginationResult } from '../utils/pagination';
 
 export const getClasses = async (
-  _: Request,
+  req: Request,
   res: Response,
   next: NextFunction
 ) => {
   try {
+    const { studentId, teacherId } = req.query;
+
+    // Construir filtros baseado nos query params
+    const where: any = {};
+    
+    // Filtrar por professor
+    if (teacherId) {
+      where.teacherId = teacherId as string;
+    }
+
+    // Filtrar por aluno matriculado
+    if (studentId) {
+      where.ClassStudent = {
+        some: {
+          studentId: studentId as string,
+        },
+      };
+    }
+
     const classes = await prisma.class.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       include: {
         Attendance: true,
-        ClassStudent: true,
+        ClassStudent: studentId
+          ? {
+              where: {
+                studentId: studentId as string,
+              },
+            }
+          : true,
       },
     });
 
