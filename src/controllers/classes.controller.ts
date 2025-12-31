@@ -110,6 +110,26 @@ export const getClassById = async (
 
     const studentsMap = new Map(students.map((s) => [s.id, s]));
 
+    // Mapear e ordenar alunos alfabeticamente por nome
+    const studentsList = classItem.ClassStudent.map((cs) => {
+      const student = studentsMap.get(cs.studentId);
+      return {
+        id: cs.id,
+        studentId: cs.studentId,
+        student: student ? {
+          id: student.id,
+          name: student.name,
+          email: student.email,
+          role: student.role.toLowerCase(),
+        } : null,
+        createdAt: cs.createdAt,
+      };
+    }).sort((a, b) => {
+      const nameA = (a.student?.name || '').toLowerCase();
+      const nameB = (b.student?.name || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
     res.json({
       success: true,
       data: {
@@ -129,20 +149,7 @@ export const getClassById = async (
           date: att.date,
           status: att.status,
         })),
-        students: classItem.ClassStudent.map((cs) => {
-          const student = studentsMap.get(cs.studentId);
-          return {
-            id: cs.id,
-            studentId: cs.studentId,
-            student: student ? {
-              id: student.id,
-              name: student.name,
-              email: student.email,
-              role: student.role.toLowerCase(),
-            } : null,
-            createdAt: cs.createdAt,
-          };
-        }),
+        students: studentsList,
         createdAt: classItem.createdAt,
         updatedAt: classItem.updatedAt,
       },
